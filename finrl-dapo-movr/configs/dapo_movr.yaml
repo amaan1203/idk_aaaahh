@@ -1,0 +1,54 @@
+# Novel contribution: Multi-Objective Verifiable Reward (MOVR / Fin-RLVR)
+algorithm: dapo_movr
+model: MlpPolicy
+env: env_movr                      # uses new MOVR reward env
+
+# DAPO-specific (same as baseline)
+epsilon_low: 0.2
+epsilon_high: 0.28
+dynamic_sampling: true
+
+# MOVR reward components
+# R = alpha * accuracy_signal + beta * delta_sharpe - gamma * drawdown_penalty
+movr_alpha: 1.0
+movr_beta: 0.5
+movr_gamma: 0.3
+sharpe_window: 20                  # rolling window (days) for delta_sharpe computation
+
+# MOVR sweep configs (used by 02_train_movr.py — overrides movr_* above)
+sweep_configs:
+  - name: acc_only
+    movr_alpha: 1.0
+    movr_beta: 0.0
+    movr_gamma: 0.0
+  - name: sharpe_only
+    movr_alpha: 0.0
+    movr_beta: 1.0
+    movr_gamma: 0.0
+  - name: mdd_only
+    movr_alpha: 0.0
+    movr_beta: 0.0
+    movr_gamma: 1.0
+  - name: balanced
+    movr_alpha: 1.0
+    movr_beta: 0.5
+    movr_gamma: 0.3
+  - name: paper_equivalent
+    movr_alpha: 3.0
+    movr_beta: 1.0
+    movr_gamma: 0.0
+
+# Training (same as baseline)
+total_epochs: 100
+steps_per_epoch: 20000
+learning_rate: 3.0e-4
+gamma: 0.99
+train_pi_iters: 80
+train_v_iters: 80
+target_kl: 0.01
+
+train_start: "2013-01-01"
+train_end: "2018-12-31"
+test_start: "2019-01-01"
+test_end: "2023-12-31"
+initial_capital: 1000000
