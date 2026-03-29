@@ -1,103 +1,91 @@
 """
-src/evaluation/metrics.py — Financial Performance Metrics
-=========================================================
-All metrics computed from a daily returns series.
-No external dependencies beyond numpy and pandas.
+src/evaluation/metrics.py
+==========================
+Financial performance metrics from a daily returns series.
+No ML dependencies. numpy only.
 
-Inputs: array or Series of daily percentage returns
-Outputs: dict with Sharpe, MDD, Calmar, Sortino, CVaR, etc.
+Inputs:  list or ndarray of daily fractional returns (e.g. 0.012 = +1.2%)
+Outputs: dict of performance metrics
+
+Corresponds to: evaluation methodology in arXiv:2505.06408
 """
 
 import numpy as np
-import pandas as pd
 from typing import Union
 
 
-def compute_all_metrics(
-    daily_returns: Union[pd.Series, np.ndarray],
-    trading_days_per_year: int = 252,
+def compute_all(
+    daily_returns: Union[list, np.ndarray],
+    trading_days: int = 252,
 ) -> dict:
     """
     Compute a full suite of financial performance metrics.
 
     Parameters
     ----------
-    daily_returns : series of daily percentage returns (e.g. 0.012 = +1.2%)
-    trading_days_per_year : annualisation factor (default 252)
+    daily_returns : list or ndarray of daily fractional returns
+    trading_days  : trading days per year for annualisation (default 252)
 
     Returns
     -------
-    dict with keys: cumulative_return, annualised_return, sharpe_ratio,
-                    max_drawdown, calmar_ratio, sortino_ratio,
-                    cvar_5pct, rachev_ratio, win_rate, n_days
+    dict with keys:
+        cumulative_return, annualised_return, sharpe_ratio,
+        max_drawdown, calmar_ratio, sortino_ratio,
+        rachev_ratio, cvar_5pct, win_rate, n_days
     """
     r = np.array(daily_returns, dtype=np.float64)
-    n = len(r)
+    n, eps = len(r), 1e-8
+
     if n == 0:
         return {k: 0.0 for k in [
             "cumulative_return", "annualised_return", "sharpe_ratio",
             "max_drawdown", "calmar_ratio", "sortino_ratio",
-            "cvar_5pct", "rachev_ratio", "win_rate", "n_days",
+            "rachev_ratio", "cvar_5pct", "win_rate", "n_days"
         ]}
 
-    # Cumulative return
-    cum_return = float((1 + r).prod() - 1)
-
-    # Annualised return (CAGR)
-    ann_return = float((1 + cum_return) ** (trading_days_per_year / n) - 1)
-
-    # Sharpe ratio (annualised, risk-free rate = 0)
-    sharpe = float((r.mean() / (r.std() + 1e-8)) * np.sqrt(trading_days_per_year))
+    cum  = float((1 + r).prod() - 1)
+    ann  = float((1 + cum) ** (trading_days / n) - 1)
+    sharpe = float((r.mean() / (r.std() + eps)) * np.sqrt(trading_days))
 
     # Max drawdown
-    cum_curve = (1 + r).cumprod()
-    rolling_peak = np.maximum.accumulate(cum_curve)
-    drawdowns = (cum_curve - rolling_peak) / (rolling_peak + 1e-8)
-    max_drawdown = float(drawdowns.min())   # negative number
+    curve = (1 + r).cumprod()
+    mdd   = float(((curve - np.maximum.accumulate(curve)) /
+                   (np.maximum.accumulate(curve) + eps)).min())
+    calmar = float(ann / (abs(mdd) + eps))
 
-    # Calmar ratio
-    calmar = float(ann_return / (abs(max_drawdown) + 1e-8))
-
-    # Sortino ratio (penalises only downside deviation)
-    downside = r[r < 0]
-    downside_std = float(downside.std() + 1e-8) if len(downside) > 0 else 1e-8
-    sortino = float((r.mean() / downside_std) * np.sqrt(trading_days_per_year))
+    # Sortino ratio (downside deviation)
+    down = r[r < 0]
+    sortino = float((r.mean() / ((down.std() if len(down) > 0 else eps) + eps))
+                    * np.sqrt(trading_days))
 
     # CVaR at 5% (expected loss in worst 5% of days)
-    p5 = np.percentile(r, 5)
-    cvar_5 = float(r[r <= p5].mean()) if (r <= p5).any() else float(p5)
+    cvar_t = np.percentile(r, 5)
+    cvar_5 = float(r[r <= cvar_t].mean()) if (r <= cvar_t).any() else float(cvar_t)
 
-    # Rachev ratio (upside / downside tail)
-    p95 = np.percentile(r, 95)
-    top5_mean = float(r[r >= p95].mean()) if (r >= p95).any() else 0.0
-    rachev = float(top5_mean / (abs(cvar_5) + 1e-8))
-
-    # Win rate
-    win_rate = float((r > 0).mean())
+    # Rachev ratio (expected gain top 5% / expected loss bottom 5%)
+    top5 = r[r >= np.percentile(r, 95)]
+    rachev = float((top5.mean() if len(top5) > 0 else 0.0) / (abs(cvar_5) + eps))
 
     return {
-        "cumulative_return": cum_return,
-        "annualised_return": ann_return,
-        "sharpe_ratio": sharpe,
-        "max_drawdown": max_drawdown,
-        "calmar_ratio": calmar,
-        "sortino_ratio": sortino,
-        "cvar_5pct": cvar_5,
-        "rachev_ratio": rachev,
-        "win_rate": win_rate,
-        "n_days": int(n),
+        "cumulative_return": cum,
+        "annualised_return": ann,
+        "sharpe_ratio":      sharpe,
+        "max_drawdown":      mdd,
+        "calmar_ratio":      calmar,
+        "sortino_ratio":     sortino,
+        "cvar_5pct":         cvar_5,
+        "rachev_ratio":      rachev,
+        "win_rate":          float((r > 0).mean()),
+        "n_days":            int(n),
     }
 
 
-def metrics_to_row(method_name: str, metrics: dict, training_time_hours: float = 0.0) -> dict:
-    """Format metrics dict as a flat row for comparison tables."""
-    return {
-        "method": method_name,
-        "cumulative_return_pct": f"{metrics['cumulative_return']*100:.2f}%",
-        "sharpe_ratio": f"{metrics['sharpe_ratio']:.3f}",
-        "max_drawdown_pct": f"{metrics['max_drawdown']*100:.2f}%",
-        "calmar_ratio": f"{metrics['calmar_ratio']:.3f}",
-        "sortino_ratio": f"{metrics['sortino_ratio']:.3f}",
-        "win_rate_pct": f"{metrics['win_rate']*100:.1f}%",
-        "training_time_hours": f"{training_time_hours:.2f}h",
-    }
+def metrics_to_row(metrics: dict, method_name: str = "") -> dict:
+    """
+    Format metrics dict as a flat row for DataFrame concatenation.
+    Adds a 'method' key if method_name is provided.
+    """
+    row = {k: round(v, 6) if isinstance(v, float) else v for k, v in metrics.items()}
+    if method_name:
+        row["method"] = method_name
+    return row

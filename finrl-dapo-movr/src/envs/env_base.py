@@ -56,8 +56,19 @@ class StockTradingEnv(gym.Env):
         self.day = day
         self.random_seed = random_seed
 
+        # --- OPTIMIZATION: Vectorize data to NumPy for speed ---
+        # Instead of df.loc in each step, we use pre-indexed arrays
+        self.df = self.df.sort_values(["date", "tic"])
+        self.dates = self.df["date"].unique()
+        self.total_days = len(self.dates)
+        
+        # Reshape close prices and indicators to (total_days, stock_dim)
+        self.price_array = self.df["close"].values.reshape(self.total_days, self.stock_dim)
+        self.tech_arrays = []
+        for ti in self.tech_indicator_list:
+            self.tech_arrays.append(self.df[ti].values.reshape(self.total_days, self.stock_dim))
+        
         # Calculate state space dynamically
-        # 1 (capital) + stock_dim (prices) + stock_dim (holdings) + stock_dim * num_indicators
         self.state_space = 1 + 2 * self.stock_dim + self.stock_dim * len(self.tech_indicator_list)
         self.action_space_dim = self.stock_dim
 
@@ -72,14 +83,13 @@ class StockTradingEnv(gym.Env):
         )
 
         # Time tracking
-        self.data = self.df.loc[self.day, :]
         self.terminal = False
         self.portfolio_value = self.initial_amount
         self.holdings = np.zeros(self.stock_dim)
         self.portfolio_value_memory = [self.initial_amount]
         self.returns_memory = []
         self.actions_memory = []
-        self.date_memory = [self._get_date()]
+        self.date_memory = [self.dates[self.day]]
         self.asset_memory = [self.initial_amount]
         self.rewards_memory = []
         self.cost = 0
@@ -89,65 +99,35 @@ class StockTradingEnv(gym.Env):
         # State
         self.state = self._initiate_state()
 
-    def _get_date(self):
-        if "date" in self.df.columns.tolist():
-            return self.data["date"].iloc[0] if isinstance(self.data, pd.DataFrame) else self.data["date"]
-        return self.day
-
     def _initiate_state(self):
-        if self.stock_dim > 1:
-            state = (
-                [self.portfolio_value]
-                + self.data.close.values.tolist()
-                + self.holdings.tolist()
-                + sum(
-                    [self.data[ti].values.tolist() for ti in self.tech_indicator_list],
-                    [],
-                )
-            )
-        else:
-            state = (
-                [self.portfolio_value]
-                + [self.data.close]
-                + self.holdings.tolist()
-                + [self.data[ti] for ti in self.tech_indicator_list]
-            )
+        curr_prices = self.price_array[self.day]
+        state = [self.portfolio_value] + curr_prices.tolist() + self.holdings.tolist()
+        for tech_arr in self.tech_arrays:
+            state += tech_arr[self.day].tolist()
         return state
 
     def _update_state(self):
         return self._initiate_state()
 
     def step(self, actions):
-        self.terminal = self.day >= len(self.df.index.unique()) - 1
+        self.terminal = self.day >= self.total_days - 1
         if self.terminal:
             return np.array(self.state, dtype=np.float32), 0.0, True, False, {}
 
-        # 1. Action translation: scale -1..1 to -hmax..hmax shares
+        # 1. Action translation
         actions = actions * self.hmax
         
-        # 2. Execute trades (simplified)
-        # In a real impl, we'd check if we have enough cash to buy
-        # Here we assume frictionless weight adjustment for the baseline reproduction
-        # but calculate "cost" for metrics.
-        
-        prev_close = self.data.close.values if self.stock_dim > 1 else np.array([self.data.close])
+        prev_close = self.price_array[self.day]
         
         # Advance time
         self.day += 1
-        self.data = self.df.loc[self.day, :]
-        curr_close = self.data.close.values if self.stock_dim > 1 else np.array([self.data.close])
+        curr_close = self.price_array[self.day]
         
-        # Calculate daily return: sum(weights * asset_returns)
-        # For the baseline, we assume an equal-weight long-only or action-weighted long-only.
-        # Let's use the provided actions as target weights (softmaxed or similar) 
-        # but the original DAPO uses them as share counts.
-        
-        # Simplified return calculation matching FinRL standard:
-        # portfolio_value = cash + sum(holdings * price)
-        # But here we use a return-based update for stability
+        # 2. Calculate daily return
+        # portfolio_return = sum(weights * asset_returns)
         asset_returns = (curr_close - prev_close) / (prev_close + 1e-8)
         
-        # Normalize actions to weights (positive only for long-only baseline)
+        # Normalize actions to weights
         weights = np.abs(actions) / (np.sum(np.abs(actions)) + 1e-8)
         portfolio_return = np.sum(weights * asset_returns)
         
@@ -166,7 +146,6 @@ class StockTradingEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.day = 0
-        self.data = self.df.loc[self.day, :]
         self.terminal = False
         self.portfolio_value = self.initial_amount
         self.holdings = np.zeros(self.stock_dim)

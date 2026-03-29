@@ -19,7 +19,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Tuple
 
-from src.evaluation.metrics import compute_all_metrics
+from src.evaluation.metrics import compute_all
 
 
 def run_backtest(
@@ -28,7 +28,7 @@ def run_backtest(
     initial_capital: float = 1_000_000,
     method_name: str = "method",
     output_dir: Path = Path("results"),
-) -> Tuple[pd.DataFrame, dict]:
+) -> Tuple[pd.DataFrame, list]:
     """
     Simulate a long-only equal-weight portfolio from signal predictions.
 
@@ -46,7 +46,8 @@ def run_backtest(
 
     Returns
     -------
-    (portfolio_df, metrics_dict)
+    (portfolio_df, daily_returns_list)
+    where portfolio_df has: date, portfolio_value, daily_return, cumulative_return
     """
     pred = predictions_df.copy()
     prices = price_df.copy()
@@ -64,10 +65,6 @@ def run_backtest(
     # Pre-calculate daily returns for all tickers
     prices = prices.sort_values(["ticker", "date"])
     prices["daily_return"] = prices.groupby("ticker")["close"].pct_change().fillna(0.0)
-
-    dates = sorted(pred["date"].unique())
-    portfolio_value = initial_capital
-    portfolio_history = []
 
     for date in dates:
         day_preds = pred[pred["date"] == date]
@@ -104,10 +101,9 @@ def run_backtest(
     output_dir.mkdir(parents=True, exist_ok=True)
     portfolio_df.to_csv(output_dir / f"{method_name}_backtest.csv", index=False)
 
-    # Compute metrics
-    metrics = compute_all_metrics(portfolio_df["daily_return"].values)
+    daily_returns = portfolio_df["daily_return"].tolist()
+    return portfolio_df, daily_returns
 
-    return portfolio_df, metrics
 
 
 def build_nasdaq100_benchmark(

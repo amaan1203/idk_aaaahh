@@ -1,0 +1,16 @@
+{
+  "method": "NASDAQ-100 Index",
+  "source": "Market data \u2014 buy-and-hold benchmark",
+  "test_period": "2019-01-01 to 2023-12-31",
+  "cumulative_return": 1.545,
+  "annualised_return": 0.208,
+  "sharpe_ratio": 1.02,
+  "max_drawdown": -0.329,
+  "calmar_ratio": 0.632,
+  "rachev_ratio": null,
+  "information_ratio": 0.0,
+  "cvar_5pct": -0.022,
+  "training_time_hrs": 0.0,
+  "ram_usage_gb": 0.0,
+  "notes": "Buy-and-hold. No model. Reconstruction from public index data."
+}

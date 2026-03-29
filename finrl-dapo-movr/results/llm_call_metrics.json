@@ -1,0 +1,16 @@
+{
+  "method": "LLM Call (Zero-Shot, claude-sonnet-4-6)",
+  "source": "This work \u2014 run scripts/03_llm_call_baseline.py",
+  "test_period": "2019-01-01 to 2023-12-31",
+  "cumulative_return": null,
+  "annualised_return": null,
+  "sharpe_ratio": null,
+  "max_drawdown": null,
+  "calmar_ratio": null,
+  "rachev_ratio": null,
+  "information_ratio": null,
+  "cvar_5pct": null,
+  "training_time_hrs": 0.0,
+  "ram_usage_gb": 0.0,
+  "notes": "No training. 500 test samples. Anthropic API only."
+}

@@ -1,0 +1,17 @@
+model: "Qwen/Qwen2.5-7B-Instruct"
+dtype: "bfloat16"
+max_model_len: 2048
+gpu_memory_utilization: 0.85
+port: 8000
+
+batch_sizes: [1, 2, 4, 8, 16, 32]
+max_new_tokens: 64
+n_warmup_iters: 3
+n_bench_iters: 10
+temperature: 0.8
+
+dummy_prompt: >
+  Stock: AAPL, Date: 2022-03-15, Price change (7-day): +1.23%,
+  Sentiment score (1-5): 3.8, Risk score (1-5): 2.1,
+  MACD: 0.0042, RSI: 58.3.
+  Based on these signals, should you BUY or SELL tomorrow?

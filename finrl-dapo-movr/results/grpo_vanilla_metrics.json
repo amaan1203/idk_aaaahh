@@ -1,0 +1,16 @@
+{
+  "method": "GRPO Vanilla",
+  "source": "This work \u2014 run scripts/02_train_movr.py",
+  "test_period": "2019-01-01 to 2023-12-31",
+  "cumulative_return": null,
+  "annualised_return": null,
+  "sharpe_ratio": null,
+  "max_drawdown": null,
+  "calmar_ratio": null,
+  "rachev_ratio": null,
+  "information_ratio": null,
+  "cvar_5pct": null,
+  "training_time_hrs": null,
+  "ram_usage_gb": null,
+  "notes": "Symmetric epsilon clipping, no dynamic sampling. Filled by training."
+}

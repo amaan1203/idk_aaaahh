@@ -1,0 +1,16 @@
+{
+  "method": "CPPO-DeepSeek",
+  "source": "Zha & Liu, arXiv:2505.06408, Table 1",
+  "test_period": "2020-01-01 to 2023-12-31",
+  "cumulative_return": 2.15,
+  "annualised_return": 0.316,
+  "sharpe_ratio": null,
+  "max_drawdown": -0.35,
+  "calmar_ratio": null,
+  "rachev_ratio": 0.9818,
+  "information_ratio": 0.0078,
+  "cvar_5pct": -0.0437,
+  "training_time_hrs": 7.5,
+  "ram_usage_gb": 120.0,
+  "notes": "Prior SOTA. CPPO with CVaR constraints + DeepSeek LLM signals."
+}

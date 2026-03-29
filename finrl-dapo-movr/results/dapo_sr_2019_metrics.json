@@ -1,0 +1,17 @@
+{
+  "method": "DAPO-SR (paper, 2019-2023)",
+  "source": "Zha & Liu, arXiv:2505.06408, Table 2",
+  "test_period": "2019-01-01 to 2023-12-31",
+  "cumulative_return": 3.3558,
+  "annualised_return": 0.337,
+  "sharpe_ratio": null,
+  "max_drawdown": -0.5024,
+  "calmar_ratio": null,
+  "rachev_ratio": 1.09,
+  "information_ratio": 0.3,
+  "cvar_5pct": -0.055,
+  "outperformance_freq": 0.496,
+  "training_time_hrs": 2.5,
+  "ram_usage_gb": 15.0,
+  "notes": "5-year evaluation. PRIMARY comparison target for MOVR results."
+}

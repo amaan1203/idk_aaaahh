@@ -34,33 +34,32 @@ class StockTradingEnvLLMRisk(StockTradingEnv):
         reward_beta: float = 1.0,    # risk exponent (paper Table 1)
         **kwargs,
     ):
-        super().__init__(df, **kwargs)
-        self.reward_alpha = reward_alpha
-        self.reward_beta = reward_beta
-
-        # Validate that sentiment/risk columns exist
+        # Validate and add dummy columns if missing BEFORE super().__init__
+        # so they get vectorized by the parent
         required_cols = {"sentiment", "risk"}
         available = set(df.columns.tolist())
         if not required_cols.issubset(available):
             missing = required_cols - available
-            # Add dummy columns if missing (fallback for testing)
             for col in missing:
-                df[col] = 3.0  # neutral default
-            self.df = df
+                df[col] = 3.0
             print(f"[WARNING] Missing columns {missing}: using neutral defaults.")
+        
+        super().__init__(df, **kwargs)
+        self.reward_alpha = reward_alpha
+        self.reward_beta = reward_beta
+
+        # Vectorize sentiment and risk for speed
+        # Parent already sorted and reshaped price_array, we do same for these
+        self.sentiment_array = self.df["sentiment"].values.reshape(self.total_days, self.stock_dim)
+        self.risk_array = self.df["risk"].values.reshape(self.total_days, self.stock_dim)
 
     def _compute_llm_reward_multiplier(self) -> float:
         """
-        Compute the sentiment-risk multiplier from current step's data.
+        Compute the sentiment-risk multiplier from current step's vectorized data.
         Returns exp(alpha * sentiment_norm - beta * risk_norm)
-        where sentiment/risk are normalised from [1,5] to [0,1].
         """
-        if isinstance(self.data, pd.DataFrame):
-            sentiment = self.data["sentiment"].mean() if "sentiment" in self.data.columns else 3.0
-            risk = self.data["risk"].mean() if "risk" in self.data.columns else 3.0
-        else:
-            sentiment = getattr(self.data, "sentiment", 3.0)
-            risk = getattr(self.data, "risk", 3.0)
+        sentiment = self.sentiment_array[self.day].mean()
+        risk = self.risk_array[self.day].mean()
 
         # Normalise from [1, 5] to [0, 1]
         sentiment_norm = (sentiment - 1.0) / 4.0

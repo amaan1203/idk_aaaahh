@@ -1,0 +1,17 @@
+{
+  "method": "DAPO-SR (paper, 2020-2023)",
+  "source": "Zha & Liu, arXiv:2505.06408, Table 1",
+  "test_period": "2020-01-01 to 2023-12-31",
+  "cumulative_return": 2.3049,
+  "annualised_return": 0.32,
+  "sharpe_ratio": null,
+  "max_drawdown": -0.4911,
+  "calmar_ratio": null,
+  "rachev_ratio": 1.12,
+  "information_ratio": 0.37,
+  "cvar_5pct": -0.0564,
+  "outperformance_freq": 0.5,
+  "training_time_hrs": 2.5,
+  "ram_usage_gb": 15.0,
+  "notes": "IEEE IDS 2025. 2nd place FinRL Contest 2025. alpha=3, beta=1."
+}
