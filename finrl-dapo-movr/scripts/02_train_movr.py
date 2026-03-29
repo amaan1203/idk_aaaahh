@@ -46,7 +46,8 @@ RESULTS_DIR = Path("results")
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── Load config ────────────────────────────────────────────────────────────
-cfg_path = Path("configs/dapo_movr.yaml")
+cfg_name = sys.argv[1] if len(sys.argv) > 1 else "configs/dapo_movr.yaml"
+cfg_path = Path(cfg_name)
 if not cfg_path.exists():
     print(f"[ERROR] Missing {cfg_path}"); sys.exit(1)
 with open(cfg_path) as f:
