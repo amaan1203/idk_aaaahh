@@ -37,6 +37,7 @@ if torch.cuda.is_available():
 from src.data.data_loader import get_train_test_split
 from src.envs.env_movr import StockTradingEnvMOVR
 from src.envs.env_llm_risk import StockTradingEnvLLMRisk
+from src.algorithms.dapo import DAPOAlgorithm
 from src.algorithms.dapo_movr import DAPOMOVRAlgorithm
 from src.evaluation.backtest import run_backtest
 from src.evaluation.metrics import compute_all
@@ -87,6 +88,8 @@ def run_config(name, movr_alpha, movr_beta, movr_gamma, is_grpo_vanilla=False):
         env = StockTradingEnvLLMRisk(
             df=train_indexed,
             initial_amount=cfg.get("initial_capital", 1_000_000),
+            reward_alpha=0.0,  # disable sentiment weighting for vanilla GRPO
+            reward_beta=0.0,   # disable risk weighting for vanilla GRPO
         )
     else:
         env = StockTradingEnvMOVR(
@@ -98,7 +101,8 @@ def run_config(name, movr_alpha, movr_beta, movr_gamma, is_grpo_vanilla=False):
             initial_amount=cfg.get("initial_capital", 1_000_000),
         )
 
-    algo = DAPOMOVRAlgorithm(
+    algo_class = DAPOAlgorithm if is_grpo_vanilla else DAPOMOVRAlgorithm
+    algo = algo_class(
         env=env,
         epsilon_low=cfg.get("epsilon_low", 0.2),
         epsilon_high=cfg.get("epsilon_high", 0.28),

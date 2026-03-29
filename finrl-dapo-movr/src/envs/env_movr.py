@@ -79,7 +79,7 @@ class StockTradingEnvMOVR(StockTradingEnvLLMRisk):
                 portfolio_value=self.portfolio_value,
             )
 
-            info["movr_state"] = self._movr.get_state()
+            info["movr_state"] = self._movr.state_dict()
             info["portfolio_return"] = portfolio_return
             return obs, reward, terminated, truncated, info
 
