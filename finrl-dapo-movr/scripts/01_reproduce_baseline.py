@@ -117,15 +117,36 @@ test_df_indexed.index = test_df_indexed.index // max(1, len(test_df_indexed.tic.
 
 # Generate signals using trained policy
 signals = []
-for date in test_df["date"].unique():
+obs, _ = env.reset()
+
+# We need to iterate through the test data date by date
+test_dates = sorted(test_df["date"].unique())
+for date in test_dates:
+    # Get observation for the current day
+    # In a real step-by-step backtest, we'd use env.step()
+    # but here we can just use the state from the env at each day
+    day_obs = obs
+    action = algo.get_action_deterministic(day_obs)
+    
+    # Action is a vector of length stock_dim (84 in this case)
+    # We convert it to signals: 1 (BUY) if action > 0.0 else 0 (HOLD/SELL)
+    # Match with the tickers present on that day
     day_df = test_df[test_df["date"] == date]
-    for _, row in day_df.iterrows():
-        # Use deterministic (mean) action
-        signals.append({
-            "date": date,
-            "ticker": row.get("tic", "UNKNOWN"),
-            "predicted_action": 1 if np.random.random() > 0.4 else 0,  # proxy signal
-        })
+    tics = day_df["tic"].tolist()
+    
+    for i, tic in enumerate(tics):
+        if i < len(action):
+            signals.append({
+                "date": date,
+                "ticker": tic,
+                "predicted_action": 1 if action[i] > 0.0 else 0
+            })
+    
+    # Advance env to next day to get next obs
+    obs, _, terminated, truncated, _ = env.step(action)
+    if terminated or truncated:
+        break
+
 preds_df = pd.DataFrame(signals)
 
 portfolio_df, metrics = run_backtest(

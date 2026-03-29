@@ -96,7 +96,26 @@ grpo_algo.train(
 grpo_time = time.perf_counter() - t0
 append_timing("grpo_vanilla", grpo_time)
 
-grpo_preds = make_signal_df(test_df, action_prob=0.5)
+# Generate signals using trained GRPO policy
+print("  Running GRPO inference...")
+grpo_signals = []
+obs, _ = grpo_env.reset()
+test_dates = sorted(test_df["date"].unique())
+for date in test_dates:
+    action = grpo_algo.get_action_deterministic(obs)
+    day_df = test_df[test_df["date"] == date]
+    tics = day_df["tic"].tolist()
+    for i, tic in enumerate(tics):
+        if i < len(action):
+            grpo_signals.append({
+                "date": date, "ticker": tic,
+                "predicted_action": 1 if action[i] > 0.0 else 0
+            })
+    obs, _, terminated, truncated, _ = grpo_env.step(action)
+    if terminated or truncated:
+        break
+
+grpo_preds = pd.DataFrame(grpo_signals)
 _, grpo_metrics = run_backtest(grpo_preds, test_df, method_name="grpo_vanilla")
 with open(RESULTS_DIR / "grpo_vanilla_metrics.json", "w") as f:
     json.dump({**grpo_metrics, "training_time_hours": grpo_time / 3600}, f, indent=2)

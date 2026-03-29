@@ -7,8 +7,12 @@ echo "=== FinRL-DAPO-MOVR setup ==="
 sudo apt-get update -q
 sudo apt-get install -y git wget curl tmux htop
 
-# 2. Python dependencies (pinned for reproducibility)
+# 2. Python dependencies
 pip install --upgrade pip
+echo "Installing torch stack (2.4.0)..."
+pip install torch>=2.4.0 torchvision>=0.19.0
+
+echo "Installing remaining requirements..."
 pip install -r requirements.txt
 
 # 3. Create output directories

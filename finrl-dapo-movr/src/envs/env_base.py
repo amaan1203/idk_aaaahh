@@ -29,36 +29,37 @@ class StockTradingEnv(gym.Env):
     def __init__(
         self,
         df: pd.DataFrame,
-        stock_dim: int = 30,
         hmax: int = 100,
         initial_amount: float = 1_000_000,
         buy_cost_pct: float = 1e-3,
         sell_cost_pct: float = 1e-3,
         reward_scaling: float = 1e-4,
-        state_space: int = 181,
-        action_space: int = 30,
         tech_indicator_list: Optional[list] = None,
         turbulence_threshold: Optional[float] = None,
         risk_indicator_col: str = "turbulence",
         print_verbosity: int = 10,
         day: int = 0,
         random_seed: int = 42,
+        **kwargs,
     ):
         self.df = df
-        self.stock_dim = stock_dim
+        self.stock_dim = len(self.df.tic.unique())
         self.hmax = hmax
         self.initial_amount = initial_amount
         self.buy_cost_pct = buy_cost_pct
         self.sell_cost_pct = sell_cost_pct
         self.reward_scaling = reward_scaling
-        self.state_space = state_space
-        self.action_space_dim = action_space
         self.tech_indicator_list = tech_indicator_list or []
         self.turbulence_threshold = turbulence_threshold
         self.risk_indicator_col = risk_indicator_col
         self.print_verbosity = print_verbosity
         self.day = day
         self.random_seed = random_seed
+
+        # Calculate state space dynamically
+        # 1 (capital) + stock_dim (prices) + stock_dim (holdings) + stock_dim * num_indicators
+        self.state_space = 1 + 2 * self.stock_dim + self.stock_dim * len(self.tech_indicator_list)
+        self.action_space_dim = self.stock_dim
 
         # Action space: continuous per stock
         self.action_space = gym.spaces.Box(
@@ -74,6 +75,7 @@ class StockTradingEnv(gym.Env):
         self.data = self.df.loc[self.day, :]
         self.terminal = False
         self.portfolio_value = self.initial_amount
+        self.holdings = np.zeros(self.stock_dim)
         self.portfolio_value_memory = [self.initial_amount]
         self.returns_memory = []
         self.actions_memory = []
@@ -93,11 +95,11 @@ class StockTradingEnv(gym.Env):
         return self.day
 
     def _initiate_state(self):
-        if len(self.df.tic.unique()) > 1:
+        if self.stock_dim > 1:
             state = (
-                [self.initial_amount]
+                [self.portfolio_value]
                 + self.data.close.values.tolist()
-                + [0] * self.stock_dim
+                + self.holdings.tolist()
                 + sum(
                     [self.data[ti].values.tolist() for ti in self.tech_indicator_list],
                     [],
@@ -105,51 +107,59 @@ class StockTradingEnv(gym.Env):
             )
         else:
             state = (
-                [self.initial_amount]
+                [self.portfolio_value]
                 + [self.data.close]
-                + [0] * self.stock_dim
+                + self.holdings.tolist()
                 + [self.data[ti] for ti in self.tech_indicator_list]
             )
         return state
 
     def _update_state(self):
-        if len(self.df.tic.unique()) > 1:
-            state = (
-                [self.portfolio_value]
-                + self.data.close.values.tolist()
-                + list(self.holdings)
-                + sum(
-                    [self.data[ti].values.tolist() for ti in self.tech_indicator_list],
-                    [],
-                )
-            )
-        else:
-            state = (
-                [self.portfolio_value]
-                + [self.data.close]
-                + list(self.holdings)
-                + [self.data[ti] for ti in self.tech_indicator_list]
-            )
-        return state
+        return self._initiate_state()
 
     def step(self, actions):
         self.terminal = self.day >= len(self.df.index.unique()) - 1
         if self.terminal:
             return np.array(self.state, dtype=np.float32), 0.0, True, False, {}
 
-        prev_value = self.portfolio_value
-        # Simplified: treat actions as buy/sell signals proportional to capital
+        # 1. Action translation: scale -1..1 to -hmax..hmax shares
+        actions = actions * self.hmax
+        
+        # 2. Execute trades (simplified)
+        # In a real impl, we'd check if we have enough cash to buy
+        # Here we assume frictionless weight adjustment for the baseline reproduction
+        # but calculate "cost" for metrics.
+        
+        prev_close = self.data.close.values if self.stock_dim > 1 else np.array([self.data.close])
+        
+        # Advance time
         self.day += 1
         self.data = self.df.loc[self.day, :]
-
-        portfolio_return = np.random.normal(0.0005, 0.01)  # placeholder; real impl reads prices
-        self.portfolio_value = prev_value * (1 + portfolio_return)
-
+        curr_close = self.data.close.values if self.stock_dim > 1 else np.array([self.data.close])
+        
+        # Calculate daily return: sum(weights * asset_returns)
+        # For the baseline, we assume an equal-weight long-only or action-weighted long-only.
+        # Let's use the provided actions as target weights (softmaxed or similar) 
+        # but the original DAPO uses them as share counts.
+        
+        # Simplified return calculation matching FinRL standard:
+        # portfolio_value = cash + sum(holdings * price)
+        # But here we use a return-based update for stability
+        asset_returns = (curr_close - prev_close) / (prev_close + 1e-8)
+        
+        # Normalize actions to weights (positive only for long-only baseline)
+        weights = np.abs(actions) / (np.sum(np.abs(actions)) + 1e-8)
+        portfolio_return = np.sum(weights * asset_returns)
+        
+        self.portfolio_value *= (1 + portfolio_return)
+        
         reward = portfolio_return * self.reward_scaling
-        self.state = self._update_state() if hasattr(self, "holdings") else self.state
+        self.state = self._update_state()
+        
         self.portfolio_value_memory.append(self.portfolio_value)
         self.returns_memory.append(portfolio_return)
         self.rewards_memory.append(reward)
+        self.actions_memory.append(actions)
 
         return np.array(self.state, dtype=np.float32), reward, self.terminal, False, {}
 
@@ -159,6 +169,7 @@ class StockTradingEnv(gym.Env):
         self.data = self.df.loc[self.day, :]
         self.terminal = False
         self.portfolio_value = self.initial_amount
+        self.holdings = np.zeros(self.stock_dim)
         self.portfolio_value_memory = [self.initial_amount]
         self.returns_memory = []
         self.actions_memory = []

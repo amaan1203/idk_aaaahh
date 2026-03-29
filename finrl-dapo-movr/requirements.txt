@@ -1,18 +1,18 @@
 # Core RL + FinRL
-torch==2.2.1
+torch>=2.4.0
 gymnasium==0.29.1
-stable-baselines3==2.3.0
-finrl==0.3.7
+stable-baselines3>=2.3.0
+finrl>=0.3.7
 
 # HuggingFace stack
-transformers==4.40.2
-datasets==2.19.1
-accelerate==0.29.3
-peft==0.10.0
-huggingface_hub==0.23.0
+transformers>=4.40.2
+datasets>=2.19.1
+accelerate>=0.29.3
+peft>=0.10.0
+huggingface_hub>=0.23.0
 
 # vLLM (inference acceleration) — requires CUDA; comment out for CPU-only runs
-vllm==0.4.2
+vllm>=0.5.0
 openai==1.26.0          # vLLM uses OpenAI-compatible API
 
 # Groq free-tier LLM baseline (replaces Anthropic)

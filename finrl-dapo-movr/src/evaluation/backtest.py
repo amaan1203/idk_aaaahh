@@ -61,6 +61,14 @@ def run_backtest(
     portfolio_value = initial_capital
     portfolio_history = []
 
+    # Pre-calculate daily returns for all tickers
+    prices = prices.sort_values(["ticker", "date"])
+    prices["daily_return"] = prices.groupby("ticker")["close"].pct_change().fillna(0.0)
+
+    dates = sorted(pred["date"].unique())
+    portfolio_value = initial_capital
+    portfolio_history = []
+
     for date in dates:
         day_preds = pred[pred["date"] == date]
         day_prices = prices[prices["date"] == date]
@@ -69,22 +77,14 @@ def run_backtest(
         n_buys = len(buy_signals)
 
         if n_buys == 0:
-            # All cash — no position change
             daily_return = 0.0
         else:
-            # Equal-weight allocation across buy signals
-            # Compute average return of bought tickers on this day
+            # Average daily return of tickers with buy signals
             bought_prices = day_prices[day_prices["ticker"].isin(buy_signals)]
-            if len(bought_prices) == 0 or "close" not in bought_prices.columns:
+            if len(bought_prices) == 0:
                 daily_return = 0.0
             else:
-                # Use pct_change from previous close (proxy: generate random if missing)
-                if "pct_change" in bought_prices.columns:
-                    avg_return = bought_prices["pct_change"].mean()
-                else:
-                    # Fallback: use close prices shifted by 1 day
-                    avg_return = float(np.random.normal(0.0005, 0.01))
-                daily_return = avg_return
+                daily_return = bought_prices["daily_return"].mean()
 
         portfolio_value *= (1 + daily_return)
         portfolio_history.append({

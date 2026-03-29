@@ -11,7 +11,7 @@ Outputs: merged pandas DataFrames for train and test periods
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Optional
 
 
 DATASET_DIR = Path("dataset")
@@ -72,24 +72,28 @@ def _merge_and_enrich(
     df = price.copy()
 
     # Merge sentiment
-    if all(k in sentiment.columns for k in ["date", "tic"]):
-        df = df.merge(
-            sentiment[["date", "tic", "sentiment"]],
-            on=merge_keys, how="left"
-        )
-    elif "sentiment" in sentiment.columns:
-        df["sentiment"] = sentiment["sentiment"].values[:len(df)] if len(sentiment) >= len(df) else 3.0
+    sent_col = _find_col(sentiment, ["sentiment", "score", "deepseek_sentiment"])
+    if sent_col and all(k in sentiment.columns for k in ["date", "tic"]):
+        # Rename to 'sentiment' if it was something else
+        sent_data = sentiment[["date", "tic", sent_col]].copy()
+        sent_data.rename(columns={sent_col: "sentiment"}, inplace=True)
+        df = df.merge(sent_data, on=merge_keys, how="left")
+    elif sent_col:
+        # Fallback: just take the values if keys don't match (less ideal)
+        df["sentiment"] = sentiment[sent_col].values[:len(df)] if len(sentiment) >= len(df) else 3.0
     else:
         df["sentiment"] = 3.0
 
     # Merge risk
-    if all(k in risk.columns for k in ["date", "tic"]):
-        df = df.merge(
-            risk[["date", "tic", "risk"]],
-            on=merge_keys, how="left"
-        )
-    elif "risk" in risk.columns:
-        df["risk"] = risk["risk"].values[:len(df)] if len(risk) >= len(df) else 3.0
+    risk_col = _find_col(risk, ["risk", "deepseek_risk", "risk_score"])
+    if risk_col and all(k in risk.columns for k in ["date", "tic"]):
+        # Rename to 'risk' if it was something else
+        risk_data = risk[["date", "tic", risk_col]].copy()
+        risk_data.rename(columns={risk_col: "risk"}, inplace=True)
+        df = df.merge(risk_data, on=merge_keys, how="left")
+    elif risk_col:
+        # Fallback
+        df["risk"] = risk[risk_col].values[:len(df)] if len(risk) >= len(df) else 3.0
     else:
         df["risk"] = 3.0
 
@@ -108,7 +112,7 @@ def _merge_and_enrich(
     return df
 
 
-def _find_col(df: pd.DataFrame, candidates: list) -> str:
+def _find_col(df: pd.DataFrame, candidates: list) -> Optional[str]:
     """Return the first candidate column name that exists in df."""
     for c in candidates:
         if c in df.columns:

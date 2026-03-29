@@ -121,14 +121,26 @@ for sweep in sweep_configs:
 
     # Generate signals and backtest
     signals = []
-    for date in test_df["date"].unique():
+    obs, _ = env.reset()
+    test_dates = sorted(test_df["date"].unique())
+    
+    for date in test_dates:
+        action = algo.get_action_deterministic(obs)
         day_df = test_df[test_df["date"] == date]
-        for _, row in day_df.iterrows():
-            signals.append({
-                "date": date,
-                "ticker": row.get("tic", "UNKNOWN"),
-                "predicted_action": 1 if np.random.random() > 0.4 else 0,
-            })
+        tics = day_df["tic"].tolist()
+        
+        for i, tic in enumerate(tics):
+            if i < len(action):
+                signals.append({
+                    "date": date,
+                    "ticker": tic,
+                    "predicted_action": 1 if action[i] > 0.0 else 0
+                })
+        
+        obs, _, terminated, truncated, _ = env.step(action)
+        if terminated or truncated:
+            break
+
     preds_df = pd.DataFrame(signals)
 
     portfolio_df, metrics = run_backtest(
