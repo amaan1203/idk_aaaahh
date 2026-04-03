@@ -1,0 +1,7 @@
+**/trading-env/
+**/indian-market-data/
+**/checkpoints/
+**/logs/
+**/results/
+**/__pycache__/
+**/.env

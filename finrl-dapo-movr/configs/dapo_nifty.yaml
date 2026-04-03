@@ -1,0 +1,23 @@
+# --- Nifty-50 Backtest Config ---
+
+# Training period
+train_start: "2010-01-01"
+train_end:   "2016-12-31"
+
+# Evaluation/Test period
+test_start:  "2017-01-01"
+test_end:    "2021-12-31"
+
+# Absolute path to the Nifty-50 dataset
+data_path: "/Users/amaansiddiqui/Desktop/trading-bot/indian-market-data/NIFTY50_all.csv"
+
+# --- LLM Settings ---
+llm_model:      "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+llm_max_steps:  200
+llm_batch_size: 4
+
+sweep_configs:
+  - name: balanced
+    movr_alpha: 1.0 # accuracy
+    movr_beta:  0.5 # sharpe
+    movr_gamma: 0.3 # drawdown
