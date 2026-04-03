@@ -1,5 +1,5 @@
 # Core RL + FinRL
-torch>=2.4.0
+torch>=2.9.0
 gymnasium==0.29.1
 stable-baselines3>=2.3.0
 finrl>=0.3.7
@@ -12,25 +12,26 @@ peft>=0.10.0
 huggingface_hub>=0.23.0
 
 # vLLM (inference acceleration) — requires CUDA; comment out for CPU-only runs
-vllm>=0.5.0
-openai==1.26.0          # vLLM uses OpenAI-compatible API
+# vllm>=0.5.0
+openai>=1.26.0          # vLLM uses OpenAI-compatible API
 
 # Groq free-tier LLM baseline (replaces Anthropic)
-groq==0.9.0
+groq>=0.30.0
 
 # Data and numerics
-pandas==2.2.2
-numpy==1.26.4
-scipy==1.13.0
-scikit-learn==1.4.2
+pandas>=2.2.2
+numpy>=2.0.0
+scipy>=1.15.0
+scikit-learn>=1.5.0
 yfinance==0.2.38
 
 # Plotting
-matplotlib==3.9.0
-seaborn==0.13.2
+matplotlib>=3.10.0
+seaborn>=0.13.2
 
 # Utilities
-python-dotenv==1.0.1
-tqdm==4.66.4
-pyyaml==6.0.1
-requests==2.31.0
+python-dotenv>=1.0.1
+tqdm>=4.66.4
+pyyaml>=6.0.2
+requests>=2.32.5
+trl

@@ -91,7 +91,7 @@ def load_model_and_tokenizer(model_path: str):
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
         torch_dtype=torch.float32,   # Use float32 for stability on MacOS
-        device_map="auto",
+        low_cpu_mem_usage=True,
     )
     return model, tokenizer
 
@@ -139,7 +139,7 @@ def run_llm_finetune(method_name: str, alpha=1.0, beta=0.5, gamma=0.3):
         per_device_train_batch_size=1,
         generation_batch_size=8,
         learning_rate=LR,
-        logging_steps=5,
+        logging_steps=1,
         save_steps=MAX_STEPS,
         report_to="none",
         seed=42,

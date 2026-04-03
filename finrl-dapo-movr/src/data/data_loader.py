@@ -148,17 +148,86 @@ def get_train_test_split(
     train_end: str = "2018-12-31",
     test_start: str = "2019-01-01",
     test_end: str = "2023-12-31",
+    data_path: Optional[str] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Load and return (train_df, test_df)."""
-    train_df = load_train_data()
-    test_df = load_test_data()
+    if data_path and Path(data_path).exists():
+        # Load from single CSV
+        df = pd.read_csv(data_path)
+        df.columns = [c.lower().strip() for c in df.columns]
+        
+        # Identify date and tic columns dynamically
+        date_col = _find_col(df, ["date", "datadate", "timestamp"])
+        tic_col = _find_col(df, ["tic", "ticker", "symbol"])
+        
+        if date_col and date_col != "date":
+            df.rename(columns={date_col: "date"}, inplace=True)
+        if tic_col and tic_col != "tic":
+            df.rename(columns={tic_col: "tic"}, inplace=True)
+            
+        df["date"] = pd.to_datetime(df["date"])
+        
+        # Keep only the 41 tickers with complete data in the requested range
+        # Find all data within the range 2010-2021 (the user's typical range)
+        mask_all = (df["date"] >= train_start) & (df["date"] <= test_end)
+        counts = df[mask_all].groupby("tic").size().sort_values(ascending=False)
+        top_41 = counts.head(41).index.tolist()
+        df = df[df["tic"].isin(top_41)].copy()
+        
+        # Engineering basic features
+        df = _add_features(df)
+        
+        train_df = df[(df["date"] >= train_start) & (df["date"] <= train_end)].copy()
+        test_df = df[(df["date"] >= test_start) & (df["date"] <= test_end)].copy()
+    else:
+        # Fallback to hardcoded files
+        train_df = load_train_data()
+        test_df = load_test_data()
 
-    train_df = train_df[
-        (train_df["date"] >= train_start) & (train_df["date"] <= train_end)
-    ].reset_index(drop=True)
+        train_df = train_df[
+            (train_df["date"] >= train_start) & (train_df["date"] <= train_end)
+        ]
 
-    test_df = test_df[
-        (test_df["date"] >= test_start) & (test_df["date"] <= test_end)
-    ].reset_index(drop=True)
+        test_df = test_df[
+            (test_df["date"] >= test_start) & (test_df["date"] <= test_end)
+        ]
 
-    return train_df, test_df
+    return train_df.reset_index(drop=True), test_df.reset_index(drop=True)
+
+
+def build_prompt_dataset(df: pd.DataFrame, lookback_days: int = 5) -> list:
+    """
+    Transform merged DataFrame into a list of prompt records.
+    Each record: {'prompt': str, 'future_return': float, 'return_history': list}
+    """
+    records = []
+    # Ensure sorted by date within each ticker
+    df = df.sort_values(["tic", "date"]).copy()
+    
+    # Calculate daily returns if not present
+    if "daily_return" not in df.columns:
+        df["daily_return"] = df.groupby("tic")["close"].pct_change().fillna(0.0)
+
+    for ticker, group in df.groupby("tic"):
+        group = group.reset_index(drop=True)
+        # We need at least lookback_days of history + 1 for future return
+        for i in range(lookback_days, len(group) - 1):
+            history = group.iloc[i - lookback_days : i]["daily_return"].tolist()
+            future_return = group.iloc[i + 1]["daily_return"]
+            
+            # Format history for the prompt
+            hist_str = ", ".join([f"{r*100:.2f}%" for r in history])
+            
+            prompt = (
+                f"As an AI stock trading assistant, analyze the following 5-day price history for {ticker}:\n"
+                f"Recent daily returns: [{hist_str}]\n"
+                f"Based on this, should we BUY, SELL, or HOLD? Give your single-word recommendation."
+            )
+            
+            records.append({
+                "prompt": prompt,
+                "future_return": float(future_return),
+                "return_history": history
+            })
+            
+    return records
